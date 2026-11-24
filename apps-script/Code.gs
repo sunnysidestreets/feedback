@@ -11,6 +11,7 @@
  *   Comments           created automatically: tick "Hide" to take a comment down
  *   Flags              created automatically: one row per browser per flagged item
  *   Ratings            created automatically: 0–5 safety rating, one row per browser per card
+ *   Rankings           created automatically: one ranked list per browser per group of alternatives
  */
 
 const CONFIG = {
@@ -22,7 +23,7 @@ const CONFIG = {
 
 /* ------------------------------------------------------------ web service
    GET  ?action=getData&b=<browser id>      → everything the page needs
-   POST {"action":"vote"|"rate"|"addComment"|"flag", "args":[...]}  (sent as text/plain)
+   POST {"action":"vote"|"rate"|"rank"|"addComment"|"flag", "args":[...]}  (sent as text/plain)
 --------------------------------------------------------------------------- */
 
 function json_(obj) {
@@ -38,7 +39,7 @@ function doGet(e) {
 function doPost(e) {
   let body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ error: "Bad request." }); }
-  const actions = { vote: vote, rate: rate, addComment: addComment, flag: flag };
+  const actions = { vote: vote, rate: rate, rank: rank, addComment: addComment, flag: flag };
   const fn = actions[body && body.action];
   if (!fn) return json_({ error: "Unknown action." });
   const args = Array.isArray(body.args) ? body.args.slice(0, 3) : [];
@@ -68,6 +69,7 @@ function commentsSheet_() {
 }
 function flagsSheet_()    { return sheet_("Flags",    ["Browser", "Item", "Flagged"]); }
 function ratingsSheet_()  { return sheet_("Ratings",  ["Browser", "Card", "Stars (0-5)", "Updated"]); }
+function rankingsSheet_() { return sheet_("Rankings", ["Browser", "Group", "Ranking (1st, 2nd, ...)", "Updated"]); }
 
 function formSheet_() {
   if (CONFIG.FORM_SHEET_NAME) return ss_().getSheetByName(CONFIG.FORM_SHEET_NAME);
@@ -115,7 +117,7 @@ function checkText_(text, minLen) {
 
 function getData(browserId) {
   browserId = cleanId_(browserId);
-  const out = { counts: {}, myVotes: {}, ratings: {}, myRatings: {}, comments: [], reports: [], flags: {}, myFlags: {} };
+  const out = { counts: {}, myVotes: {}, ratings: {}, myRatings: {}, rankings: {}, myRankings: {}, comments: [], reports: [], flags: {}, myFlags: {} };
 
   table_(votesSheet_()).rows.forEach(r => {
     const vid = String(r[0]), pid = String(r[1]), v = String(r[2]);
@@ -131,6 +133,20 @@ function getData(browserId) {
     const t = out.ratings[pid] || (out.ratings[pid] = { sum: 0, n: 0 });
     t.sum += n; t.n++;
     if (String(r[0]) === browserId) out.myRatings[pid] = n;
+  });
+
+  // rankings: for each group, how many people put each option 1st, 2nd, ...
+  table_(rankingsSheet_()).rows.forEach(r => {
+    const gid = String(r[1]), list = String(r[2] || "").split(",").map(cleanId_).filter(Boolean);
+    if (!gid || !list.length) return;
+    const g = out.rankings[gid] || (out.rankings[gid] = { n: 0, pos: {} });
+    g.n++;
+    list.forEach((id, i) => {
+      const a = g.pos[id] || (g.pos[id] = []);
+      while (a.length <= i) a.push(0);
+      a[i]++;
+    });
+    if (String(r[0]) === browserId) out.myRankings[gid] = list;
   });
 
   table_(flagsSheet_()).rows.forEach(r => {
@@ -210,6 +226,27 @@ function rate(browserId, cardId, stars) {
   } finally { lock.releaseLock(); }
 }
 
+// ranking: comma-separated card ids, best first; "" removes this browser's ranking
+function rank(browserId, groupId, ranking) {
+  browserId = cleanId_(browserId); groupId = cleanId_(groupId);
+  const seen = {};
+  const list = String(ranking || "").split(",").map(cleanId_).filter(id => id && !seen[id] && (seen[id] = true)).slice(0, 10);
+  if (!browserId || !groupId) return { error: "Bad ranking." };
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const sh = rankingsSheet_(), values = sh.getDataRange().getValues();
+    for (let i = values.length - 1; i >= 1; i--) {
+      if (String(values[i][0]) === browserId && String(values[i][1]) === groupId) {
+        if (!list.length) sh.deleteRow(i + 1);
+        else sh.getRange(i + 1, 3, 1, 2).setValues([[list.join(","), new Date()]]);
+        return { ok: true };
+      }
+    }
+    if (list.length) sh.appendRow([browserId, groupId, list.join(","), new Date()]);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
+}
+
 function addComment(browserId, cardId, text) {
   browserId = cleanId_(browserId); cardId = cleanId_(cardId);
   if (!browserId || !cardId) return { error: "Something went wrong. Please reload the page." };
@@ -242,7 +279,7 @@ function flag(browserId, itemId) {
 /* Run this once from the editor (select "setup" → Run) to create the
    Votes, Comments and Flags tabs and grant permissions. */
 function setup() {
-  votesSheet_(); commentsSheet_(); flagsSheet_(); ratingsSheet_();
+  votesSheet_(); commentsSheet_(); flagsSheet_(); ratingsSheet_(); rankingsSheet_();
   const fs = formSheet_();
   const h = fs ? table_(fs).header : [];
   const missing = ["Approved", "Title", "Outside project", "Image link"]

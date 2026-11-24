@@ -146,6 +146,31 @@
   .savg{font-size:13px;color:var(--ink-2);margin-top:6px}
   .savg b{font-family:"Young Serif",Georgia,serif;font-weight:400;color:var(--ink)}
   .savg .you{color:var(--teal-dk)}
+  .rank-panel{background:var(--card);border:2px solid var(--teal);border-radius:var(--radius);padding:18px 20px;margin:26px 0 8px;display:grid;grid-template-columns:1.25fr 1fr;gap:6px 28px}
+  @media (max-width:820px){.rank-panel{grid-template-columns:1fr}}
+  .rank-head{grid-column:1/-1}
+  .rank-head h3{margin:0 0 2px;font-family:"Young Serif",Georgia,serif;font-weight:400;font-size:21px;color:var(--teal-dk)}
+  .rank-head p{margin:0 0 6px}
+  .rank-opts{display:flex;flex-direction:column;gap:8px}
+  .rank-opt{display:flex;gap:12px;align-items:center;text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;font:inherit;cursor:pointer;color:var(--ink)}
+  .rank-opt:hover{border-color:var(--ink-3)}
+  .rank-opt.on{border-color:var(--teal);background:var(--teal-soft)}
+  .rank-num{flex:0 0 34px;height:34px;border-radius:50%;border:2px dashed #cfc6ae;display:flex;align-items:center;justify-content:center;font-family:"Young Serif",Georgia,serif;font-size:18px}
+  .rank-opt.on .rank-num{border:0;background:var(--teal-dk);color:#fffaf0}
+  .rank-t{font-weight:700;font-size:15px;line-height:1.3}
+  .rank-t small{display:block;font-weight:400;font-size:12.5px;color:var(--ink-3)}
+  .rank-clear{justify-self:start;margin-top:4px}
+  .rank-res{grid-column:2;grid-row:2 / span 2}
+  @media (max-width:820px){.rank-res{grid-column:1;grid-row:auto;margin-top:12px}}
+  .rank-res h4{margin:0 0 8px;font-size:15px}
+  .rank-res h4 span{font-weight:400;color:var(--ink-3)}
+  .rank-res ol{list-style:none;margin:0;padding:0}
+  .rank-res li{display:grid;grid-template-columns:22px 1fr;gap:2px 8px;align-items:center;margin:0 0 10px;font-size:14px}
+  .rr-pos{font-family:"Young Serif",Georgia,serif;color:var(--teal-dk);grid-row:span 2}
+  .rr-bar{height:7px;background:#eee8d8;border-radius:999px;overflow:hidden;display:block}
+  .rr-bar i{display:block;height:100%;background:var(--teal)}
+  .rr-n{grid-column:2;font-size:12.5px;color:var(--ink-3)}
+  .rr-note{margin:4px 0 0;font-size:12.5px}
   details.comments{border-top:1px solid var(--line);padding:10px 18px 14px}
   details.comments summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--ink-2)}
   .clist{list-style:none;margin:10px 0;padding:0}
@@ -467,6 +492,12 @@ const GROUPS = [
   {id:"rep",  name:"Reported by neighbors"}
 ];
 
+/* Groups of alternatives that neighbors can rank (tap 1st, 2nd, ...) */
+const RANKED = [
+  {id:"slip", title:"Rank the fixes for the Monterey slip-lane crosswalk",
+   options:["sfmta-slip-raised-xwalk","nbr-slip-cushions","nbr-slip-beacon","nbr-slip-signal"]}
+];
+
 /* Slide images (from the Nov 9, 2026 presentations to the Sunnyside Neighborhood Association) */
 const MTA = "SFMTA, Nov 9 2026", CTA = "SFCTA, Nov 9 2026";
 const IMG = {
@@ -678,7 +709,7 @@ function toast(text){
 
 const Store = (function(){
   let d = {myVotes:{}, counts:{}, comments:[], reports:[], flags:{}, myFlags:{}};
-  if(!LIVE){ d.ratings = {}; d.myRatings = {} }
+  if(!LIVE){ d.ratings = {}; d.myRatings = {}; d.rankings = {}; d.myRankings = {} }
   if(!LIVE){ try{ d = Object.assign(d, JSON.parse(lsGet(LS_KEY)) || {}) }catch(e){} }
   const save = () => { if(!LIVE) lsSet(LS_KEY, JSON.stringify(d)) };
   return {
@@ -693,6 +724,23 @@ const Store = (function(){
       save();
       if(LIVE) run("vote", BROWSER_ID, pid, next).then(r => { if(r && r.error) toast(r.error) })
                  .catch(() => toast("Your vote didn't save. Please check your connection and try again."));
+    },
+    rank(gid, list){
+      if(!d.rankings) return;
+      d.myRankings = d.myRankings || {};
+      const agg = d.rankings[gid] || (d.rankings[gid] = {n:0, pos:{}});
+      const apply = (l, sign) => { if(!l || !l.length) return; agg.n += sign;
+        l.forEach((id,i) => { const a = agg.pos[id] || (agg.pos[id] = []); while(a.length <= i) a.push(0); a[i] += sign }) };
+      apply(d.myRankings[gid], -1);
+      if(list.length){ d.myRankings[gid] = list.slice() } else { delete d.myRankings[gid] }
+      apply(d.myRankings[gid], +1);
+      save();
+      if(LIVE){
+        clearTimeout(this._rt); // wait for the tapping to settle, then save once
+        this._rt = setTimeout(() => run("rank", BROWSER_ID, gid, (d.myRankings[gid]||[]).join(","))
+          .then(x => { if(x && x.error) toast(x.error) })
+          .catch(() => toast("Your ranking didn't save. Please check your connection and try again.")), 700);
+      }
     },
     rate(pid, stars){
       if(!d.ratings) return;
@@ -835,6 +883,48 @@ function wireGalleries(root){
   });
 }
 
+function rankResults(g){
+  const agg = (Store.data().rankings||{})[g.id] || {n:0, pos:{}}, k = g.options.length;
+  return g.options.map(id => {
+    const a = agg.pos[id] || [];
+    const points = a.reduce((t,c,i) => t + c*(k-i), 0);
+    return {id, first:a[0]||0, points};
+  }).sort((x,y) => y.points - x.points || y.first - x.first);
+}
+function rankPanelHTML(g){
+  const d = Store.data();
+  if(!d.rankings) return "";              // hidden until the Google script supports rankings
+  const mine = (d.myRankings||{})[g.id] || [];
+  const byId = Object.fromEntries(PROPOSALS.map(p=>[p.id,p]));
+  const n = ((d.rankings||{})[g.id]||{}).n || 0, k = g.options.length;
+  const res = rankResults(g), maxPts = Math.max(1, ...res.map(r=>r.points));
+  const opts = g.options.map(id => {
+    const p = byId[id], r = mine.indexOf(id);
+    return `<button type="button" class="rank-opt${r>=0?" on":""}" data-gid="${esc(g.id)}" data-oid="${esc(id)}" aria-pressed="${r>=0}">
+      <span class="rank-num">${r>=0 ? r+1 : ""}</span>
+      <span class="rank-t">${esc(p.title)}<small>${esc(p.by==="Neighbors"?"Neighbor proposal":p.by+" proposal")}</small></span>
+    </button>`;
+  }).join("");
+  const results = n ? res.map((r,i) => {
+    const p = byId[r.id], pct = Math.round(r.first/n*100);
+    return `<li><span class="rr-pos">${i+1}</span><span class="rr-t">${esc(p.title)}</span>
+      <span class="rr-bar"><i style="width:${(r.points/maxPts*100).toFixed(0)}%"></i></span>
+      <span class="rr-n">${pct}% first choice</span></li>`;
+  }).join("") : "";
+  return `<section class="rank-panel" data-gid="${esc(g.id)}">
+    <div class="rank-head">
+      <h3>${esc(g.title)}</h3>
+      <p class="small">Tap your 1st choice, then your 2nd, and so on. Rank as many as you like. Tap a numbered one to take it out.</p>
+    </div>
+    <div class="rank-opts">${opts}</div>
+    ${mine.length ? `<button type="button" class="flag rank-clear" data-gclear="${esc(g.id)}">Clear my ranking</button>` : ""}
+    <div class="rank-res">
+      <h4>Neighbors' ranking ${n ? `<span>from ${n} ${n===1?"person":"people"}</span>` : ""}</h4>
+      ${n ? `<ol>${results}</ol><p class="small rr-note">Order uses points: a 1st choice earns ${k}, a 2nd earns ${k-1}, and so on.</p>` : `<p class="small" style="margin:0">No rankings yet. Be the first.</p>`}
+    </div>
+  </section>`;
+}
+
 function ratingOf(pid){ const r = (Store.data().ratings||{})[pid]; return r && r.n ? {avg:r.sum/r.n, n:r.n} : {avg:0, n:0} }
 function safetyHTML(p){
   const d = Store.data();
@@ -924,16 +1014,17 @@ function render(opts){
   let html = "";
   if(view === "new"){
     const newest = items.slice().sort((a,b)=> String(b.added||PROPOSALS_ADDED).localeCompare(String(a.added||PROPOSALS_ADDED)));
-    html = `<h2 class="group-h">Newest first <span>ideas added most recently appear at the top</span></h2><div class="grid">`
+    html = RANKED.map(rankPanelHTML).join("") + `<h2 class="group-h">Newest first <span>ideas added most recently appear at the top</span></h2><div class="grid">`
          + newest.map(tileHTML).join("") + `</div>`;
   } else if(view === "support"){
-    html = `<h2 class="group-h">All proposals <span>most support (👍 minus 👎) at the top, updating as neighbors vote</span></h2><div class="grid">`
+    html = RANKED.map(rankPanelHTML).join("") + `<h2 class="group-h">All proposals <span>most support (👍 minus 👎) at the top, updating as neighbors vote</span></h2><div class="grid">`
          + order.filter(id=>byId[id]).map(id=>tileHTML(byId[id])).join("") + `</div>`;
   } else {
     GROUPS.forEach(g => {
       const gi = order.filter(id=>byId[id] && byId[id].group===g.id);
       if(!gi.length) return;
-      html += `<h2 class="group-h">${esc(g.name)} ${g.note?`<span>${esc(g.note)}</span>`:""}</h2><div class="grid">`
+      const rg = RANKED.find(r => r.id === g.id);
+      html += `<h2 class="group-h">${esc(g.name)} ${g.note?`<span>${esc(g.note)}</span>`:""}</h2>` + (rg ? rankPanelHTML(rg) : "") + `<div class="grid">`
             + gi.map(id=>tileHTML(byId[id])).join("") + `</div>`;
     });
   }
@@ -966,6 +1057,14 @@ document.getElementById("board").addEventListener("click", e => {
     if(!dirty){ dirty = true; document.getElementById("resortBtn").classList.add("show") }
     render(); return;
   }
+  const ro = e.target.closest(".rank-opt");
+  if(ro){
+    const gid = ro.dataset.gid, oid = ro.dataset.oid, cur = ((Store.data().myRankings||{})[gid] || []).slice();
+    const i = cur.indexOf(oid); if(i >= 0) cur.splice(i,1); else cur.push(oid);
+    Store.rank(gid, cur); render(); return;
+  }
+  const rc = e.target.closest("[data-gclear]");
+  if(rc){ Store.rank(rc.dataset.gclear, []); render(); return; }
   const st = e.target.closest(".star");
   if(st){ Store.rate(st.dataset.pid, Number(st.dataset.s)); if(!dirty){ dirty = true; document.getElementById("resortBtn").classList.add("show") } render(); return; }
   const ot = e.target.closest("[data-ovtoggle]");
@@ -1010,6 +1109,13 @@ function buildCSV(){
     const c = counts(p.id);
     rows.push([p.reported?"Neighbor report":"Proposal", p.title, p.by, p.where, c.up, c.unsure, c.down, c.up-c.down, ratingOf(p.id).n ? ratingOf(p.id).avg.toFixed(2) : "", ratingOf(p.id).n, p.reported?p.change:"", p.who||"", hidden(p.id)?"yes":""]);
     d.comments.filter(x=>x.pid===p.id).forEach(x => rows.push(["Comment", p.title, "", "", "", "", "", "", "", "", x.text, x.who, hidden(x.id)?"yes":""]));
+  });
+  RANKED.forEach(g => {
+    const n = ((d.rankings||{})[g.id]||{}).n || 0;
+    rankResults(g).forEach((r,i) => {
+      const p = PROPOSALS.find(x=>x.id===r.id);
+      rows.push(["Ranking: "+g.title, p.title, p.by, "", "", "", "", "", "", "", "Place "+(i+1)+" · "+r.points+" points · "+r.first+" of "+n+" first-choice", "", ""]);
+    });
   });
   return rows.map(r=>r.map(csvCell).join(",")).join("\n");
 }
