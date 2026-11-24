@@ -7,7 +7,7 @@
 <title>Sunnyside Street Safety: Neighbor Feedback</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
   :root{
     --ink:#1e302d; --ink-2:#4a5c58; --ink-3:#7d8c88;
@@ -22,10 +22,10 @@
     --radius:14px;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,Segoe UI,sans-serif;font-size:16px;line-height:1.5}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Atkinson Hyperlegible",system-ui,-apple-system,Segoe UI,sans-serif;font-size:16.5px;line-height:1.5}
   a{color:var(--teal-dk)}
   p,li,h1,h2,h3,figcaption{text-wrap:pretty}
-  h1,h2,.group-h,.tile h3{font-family:"Fraunces",Georgia,serif;letter-spacing:0}
+  h1,h2,.group-h,.tile h3,.cta h2{font-family:"Young Serif",Georgia,serif;font-weight:400;letter-spacing:0}
   .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
   header.site{background:linear-gradient(180deg,#2b5853 0%,#3b7570 100%);color:#fffaf0;padding:34px 0 0;position:relative;overflow:hidden}
   header.site .hgrid{display:grid;grid-template-columns:1fr 410px;gap:24px;align-items:end}
@@ -55,7 +55,11 @@
   .panel ol{margin:0;padding-left:20px}
   .panel li{margin:4px 0}
   .small{font-size:14px;color:var(--ink-2)}
-  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .howto{margin:0;padding-left:20px;color:var(--ink)}
+  .howto li{margin:0 0 8px}
+  .howto li:last-child{margin-bottom:0}
+  .howto li::marker{color:var(--teal)}
 
   .toolbar{position:sticky;top:0;z-index:5;background:rgba(244,239,224,.95);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:8px}
   .toolbar .wrap{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -71,7 +75,7 @@
   .resort.show{display:inline-block}
 
   .group-h{margin:34px 0 12px;font-size:23px;font-weight:700;color:var(--teal-dk);display:flex;align-items:baseline;gap:10px}
-  .group-h span{font-size:14px;font-weight:500;color:var(--ink-3)}
+  .group-h span{font-family:"Atkinson Hyperlegible",system-ui,sans-serif;font-size:14px;font-weight:500;color:var(--ink-3)}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px}
 
   .tile{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--teal);border-radius:var(--radius);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 0 rgba(30,48,45,.04)}
@@ -358,15 +362,20 @@
   <section class="intro">
     <div class="panel">
       <h2>How this works</h2>
-      <p class="small" style="margin-top:0">Each card is one proposed change. Vote <b>👍 Support</b>, <b>🤔 Unsure / needs changes</b>, or <b>👎 Oppose</b>. You get one vote per card and can change it any time. Cards with the most support float to the top, and the order updates every minute as neighbors vote. Your own vote won't make cards jump while you're using the page.</p>
-      <div class="legend">
-        <span class="badge b-SFMTA">SFMTA proposal</span>
-        <span class="badge b-SFCTA">SFCTA proposal</span>
-        <span class="badge b-Neighbors">Neighbor proposal</span>
-        <span class="badge" style="background:var(--amber);color:#fff">Outside this project's area</span>
-      </div>
-      <p class="small">Cards with an orange border are outside the Bosworth/Monterey Quick-Build's stated area, but neighbors have asked about them. Votes there help show they need their own attention.</p>
-      <p class="small" style="margin-bottom:0">Pictures come from the SFMTA and SFCTA presentations to the Sunnyside Neighborhood Association on Nov 9, 2026. Swipe or use the arrows to see more, and tap a picture to open it full size.</p>
+      <ul class="small howto">
+        <li>Each card is one proposed change.</li>
+        <li>Vote <b>👍 Support</b>, <b>🤔 Unsure / needs changes</b>, or <b>👎 Oppose</b>. You get one vote per card, and you can change it any time.</li>
+        <li>Cards with the most support float to the top. The order updates every minute as neighbors vote, but your own vote won't make cards jump while you're using the page.</li>
+        <li>Labels show who proposed each idea:
+          <span class="legend">
+            <span class="badge b-SFMTA">SFMTA proposal</span>
+            <span class="badge b-SFCTA">SFCTA proposal</span>
+            <span class="badge b-Neighbors">Neighbor proposal</span>
+          </span>
+        </li>
+        <li>Cards with an <span class="badge" style="background:var(--amber);color:#fff">orange border</span> are outside the Bosworth/Monterey Quick-Build's stated area, but neighbors have asked about them. Votes there show they need their own attention.</li>
+        <li>Pictures come from the SFMTA and SFCTA presentations to the Sunnyside Neighborhood Association on Nov 9, 2026. Swipe or use the arrows to see more, and tap a picture to open it full size.</li>
+      </ul>
 
     </div>
     <div class="panel">
@@ -754,7 +763,7 @@ function overlaySVG(ov, key){
     if(o.t==="xwalk"){ const [x,y]=o.at, w=o.w||14, h=o.h||5, n=Math.max(3,Math.round(w/2.2));
       let bars=""; for(let i=0;i<n;i++){ const bx = x - w/2 + (i+.5)*w/n; bars += `<line x1="${bx}" y1="${y-h/2+.6}" x2="${bx}" y2="${y+h/2-.6}"/>` }
       return `<g transform="rotate(${o.rot||0} ${x} ${y})"><rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" fill="rgba(0,0,0,.25)" stroke="#f2c200" stroke-width=".8"/><g stroke="#fff" stroke-width="1">${bars}</g></g>`; }
-    if(o.t==="label"){ const [x,y]=o.at; return `<text x="${x}" y="${y}" font-size="4.6" font-weight="700" font-family="Public Sans, sans-serif" fill="#1e302d" stroke="#fffdf7" stroke-width="1.4" paint-order="stroke" text-anchor="middle">${esc(o.text)}</text>`; }
+    if(o.t==="label"){ const [x,y]=o.at; return `<text x="${x}" y="${y}" font-size="4.6" font-weight="700" font-family="Atkinson Hyperlegible, sans-serif" fill="#1e302d" stroke="#fffdf7" stroke-width="1.4" paint-order="stroke" text-anchor="middle">${esc(o.text)}</text>`; }
     return "";
   }).join("");
   return `<svg class="ov" viewBox="0 0 160 90" preserveAspectRatio="none" aria-hidden="true"><defs>${defs}</defs>${body}</svg>`;
