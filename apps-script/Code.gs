@@ -10,6 +10,7 @@
  *   Votes              created automatically: one row per browser per card
  *   Comments           created automatically: tick "Hide" to take a comment down
  *   Flags              created automatically: one row per browser per flagged item
+ *   Ratings            created automatically: 0–5 safety rating, one row per browser per card
  */
 
 const CONFIG = {
@@ -21,7 +22,7 @@ const CONFIG = {
 
 /* ------------------------------------------------------------ web service
    GET  ?action=getData&b=<browser id>      → everything the page needs
-   POST {"action":"vote"|"addComment"|"flag", "args":[...]}  (sent as text/plain)
+   POST {"action":"vote"|"rate"|"addComment"|"flag", "args":[...]}  (sent as text/plain)
 --------------------------------------------------------------------------- */
 
 function json_(obj) {
@@ -37,7 +38,7 @@ function doGet(e) {
 function doPost(e) {
   let body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json_({ error: "Bad request." }); }
-  const actions = { vote: vote, addComment: addComment, flag: flag };
+  const actions = { vote: vote, rate: rate, addComment: addComment, flag: flag };
   const fn = actions[body && body.action];
   if (!fn) return json_({ error: "Unknown action." });
   const args = Array.isArray(body.args) ? body.args.slice(0, 3) : [];
@@ -66,6 +67,7 @@ function commentsSheet_() {
   return sh;
 }
 function flagsSheet_()    { return sheet_("Flags",    ["Browser", "Item", "Flagged"]); }
+function ratingsSheet_()  { return sheet_("Ratings",  ["Browser", "Card", "Stars (0-5)", "Updated"]); }
 
 function formSheet_() {
   if (CONFIG.FORM_SHEET_NAME) return ss_().getSheetByName(CONFIG.FORM_SHEET_NAME);
@@ -113,7 +115,7 @@ function checkText_(text, minLen) {
 
 function getData(browserId) {
   browserId = cleanId_(browserId);
-  const out = { counts: {}, myVotes: {}, comments: [], reports: [], flags: {}, myFlags: {} };
+  const out = { counts: {}, myVotes: {}, ratings: {}, myRatings: {}, comments: [], reports: [], flags: {}, myFlags: {} };
 
   table_(votesSheet_()).rows.forEach(r => {
     const vid = String(r[0]), pid = String(r[1]), v = String(r[2]);
@@ -121,6 +123,14 @@ function getData(browserId) {
     const c = out.counts[pid] || (out.counts[pid] = { up: 0, unsure: 0, down: 0 });
     c[v]++;
     if (vid === browserId) out.myVotes[pid] = v;
+  });
+
+  table_(ratingsSheet_()).rows.forEach(r => {
+    const pid = String(r[1]), n = Number(r[2]);
+    if (!pid || r[2] === "" || !(n >= 0 && n <= 5)) return;
+    const t = out.ratings[pid] || (out.ratings[pid] = { sum: 0, n: 0 });
+    t.sum += n; t.n++;
+    if (String(r[0]) === browserId) out.myRatings[pid] = n;
   });
 
   table_(flagsSheet_()).rows.forEach(r => {
@@ -179,6 +189,27 @@ function vote(browserId, cardId, choice) {
   } finally { lock.releaseLock(); }
 }
 
+// stars: 0–5, or "" to remove the rating
+function rate(browserId, cardId, stars) {
+  browserId = cleanId_(browserId); cardId = cleanId_(cardId);
+  const clear = stars === "" || stars === null || stars === undefined;
+  const n = Number(stars);
+  if (!browserId || !cardId || (!clear && !(Number.isInteger(n) && n >= 0 && n <= 5))) return { error: "Bad rating." };
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const sh = ratingsSheet_(), values = sh.getDataRange().getValues();
+    for (let i = values.length - 1; i >= 1; i--) {
+      if (String(values[i][0]) === browserId && String(values[i][1]) === cardId) {
+        if (clear) sh.deleteRow(i + 1);
+        else sh.getRange(i + 1, 3, 1, 2).setValues([[n, new Date()]]);
+        return { ok: true };
+      }
+    }
+    if (!clear) sh.appendRow([browserId, cardId, n, new Date()]);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
+}
+
 function addComment(browserId, cardId, text) {
   browserId = cleanId_(browserId); cardId = cleanId_(cardId);
   if (!browserId || !cardId) return { error: "Something went wrong. Please reload the page." };
@@ -211,7 +242,7 @@ function flag(browserId, itemId) {
 /* Run this once from the editor (select "setup" → Run) to create the
    Votes, Comments and Flags tabs and grant permissions. */
 function setup() {
-  votesSheet_(); commentsSheet_(); flagsSheet_();
+  votesSheet_(); commentsSheet_(); flagsSheet_(); ratingsSheet_();
   const fs = formSheet_();
   const h = fs ? table_(fs).header : [];
   const missing = ["Approved", "Title", "Outside project", "Image link"]

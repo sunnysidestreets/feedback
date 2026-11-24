@@ -115,7 +115,7 @@
   .tile h3{margin:0 0 4px;font-size:18px;line-height:1.3}
   .where{font-size:14px;color:var(--ink-2);margin:0 0 10px}
   .tile p{margin:0 0 10px}
-  .why{font-size:14px;background:#f5f0e2;border-radius:10px;padding:8px 10px;margin:0 0 10px}
+  .why{font-size:15px;background:#f5f0e2;border-radius:10px;padding:8px 10px;margin:0 0 10px}
   .why b{color:var(--ink)}
   .open-q{font-size:13.5px;color:#6b4a00;background:var(--amber-soft);border-radius:10px;padding:8px 10px;margin:0 0 10px}
   .maplink{font-size:13.5px;font-weight:600}
@@ -132,6 +132,20 @@
   .bar{height:6px;display:flex;margin:0 18px 12px;border-radius:999px;overflow:hidden;background:#eee}
   .bar i{display:block;height:100%}
 
+  .proposal{font-size:15px}
+  .proposal b{color:var(--ink)}
+  .safety{padding:2px 18px 14px}
+  .sq{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px}
+  .stars{display:flex;gap:4px}
+  .star{flex:1;min-width:0;height:38px;border:1.5px solid var(--line);background:#fff;border-radius:10px;font:inherit;font-size:20px;line-height:1;color:#d9d2bd;cursor:pointer;padding:0}
+  .star.zero{font-family:"Young Serif",Georgia,serif;font-size:16px;color:var(--ink-3)}
+  .star.on{color:#e0a100;border-color:#e0a100;background:#fff8e1}
+  .star.zero.on{color:var(--ink);border-color:var(--ink-3);background:#f1efe9}
+  .star:hover{border-color:var(--ink-3)}
+  .sscale{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3);margin-top:4px}
+  .savg{font-size:13px;color:var(--ink-2);margin-top:6px}
+  .savg b{font-family:"Young Serif",Georgia,serif;font-weight:400;color:var(--ink)}
+  .savg .you{color:var(--teal-dk)}
   details.comments{border-top:1px solid var(--line);padding:10px 18px 14px}
   details.comments summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--ink-2)}
   .clist{list-style:none;margin:10px 0;padding:0}
@@ -526,18 +540,18 @@ const PROPOSALS = [
    title:"Speed cushions before the slip-lane crosswalk",
    where:"Same slip lane, just before the crosswalk",
    change:"Install speed cushions ahead of the crosswalk so drivers are already slow when they reach it. Cushions have gaps that buses can straddle.",
-   why:null, images:[IMG.montIssues], map:"Monterey Blvd & Circular Ave, San Francisco"},
+   why:"The slip lane has no stop sign or signal, and drivers looking left for a gap often miss people crossing on their right.", images:[IMG.montIssues], map:"Monterey Blvd & Circular Ave, San Francisco"},
   {id:"nbr-slip-beacon", look:"Right-turn slip lane without stop or signal", group:"slip", by:"Neighbors", alt:"sfmta-slip-raised-xwalk",
    title:"Flashing beacon at the slip-lane crosswalk",
    where:"Same slip lane",
-   change:"A push-button flashing beacon that lights up the crosswalk when someone is crossing.",
-   why:"Gets drivers' attention without slowing buses. Many more people use this crosswalk than the one at Acadia.",
+   change:"A push-button flashing beacon that lights up the crosswalk when someone is crossing. It gets drivers' attention without slowing buses, and many more people use this crosswalk than the one at Acadia.",
+   why:"The slip lane has no stop sign or signal, and drivers looking left for a gap often miss people crossing on their right.",
    images:[IMG.montIssues], map:"Monterey Blvd & Circular Ave, San Francisco"},
   {id:"nbr-slip-signal", look:"Right-turn slip lane without stop or signal", group:"slip", by:"Neighbors", alt:"sfmta-slip-raised-xwalk",
    title:"Full traffic signal at the slip lane",
    where:"Same slip lane",
    change:"A traffic signal that controls when cars may turn onto Monterey, with a protected time for people crossing.",
-   why:null, images:[IMG.montIssues], map:"Monterey Blvd & Circular Ave, San Francisco"},
+   why:"The slip lane has no stop sign or signal, and drivers looking left for a gap often miss people crossing on their right.", images:[IMG.montIssues], map:"Monterey Blvd & Circular Ave, San Francisco"},
 
   /* ---- Monterey, Circular to Diamond (SFMTA slides 12–13) ---- */
   {id:"sfmta-mont-eb-bike-extend", look:"Eastbound bike lane extended to intersection", group:"mont", by:"SFMTA",
@@ -595,8 +609,8 @@ const PROPOSALS = [
   {id:"sfmta-bos-buffered-bike-lane", look:"Buffered bike lane", group:"bos", by:"SFMTA",
    title:"Buffered bike lane on Bosworth approaching Arlington",
    where:"Bosworth St, on the BART side, approaching Arlington",
-   change:"Add a painted buffer between the bike lane and car traffic.",
-   why:"Makes biking more comfortable and helps separate bikes from cars.",
+   change:"Add a painted buffer between the bike lane and car traffic, to make biking more comfortable and better separate bikes from cars.",
+   why:null,
    images:[IMG.bosIdeas, IMG.bosIssues], map:"Bosworth St & Arlington St, San Francisco"},
   {id:"sfmta-bos-wb-floating-parking", look:"Westbound bikeway protected by floating parking", group:"bos", by:"SFMTA",
    title:"Westbound bikeway protected by parked cars",
@@ -664,6 +678,7 @@ function toast(text){
 
 const Store = (function(){
   let d = {myVotes:{}, counts:{}, comments:[], reports:[], flags:{}, myFlags:{}};
+  if(!LIVE){ d.ratings = {}; d.myRatings = {} }
   if(!LIVE){ try{ d = Object.assign(d, JSON.parse(lsGet(LS_KEY)) || {}) }catch(e){} }
   const save = () => { if(!LIVE) lsSet(LS_KEY, JSON.stringify(d)) };
   return {
@@ -678,6 +693,18 @@ const Store = (function(){
       save();
       if(LIVE) run("vote", BROWSER_ID, pid, next).then(r => { if(r && r.error) toast(r.error) })
                  .catch(() => toast("Your vote didn't save. Please check your connection and try again."));
+    },
+    rate(pid, stars){
+      if(!d.ratings) return;
+      d.myRatings = d.myRatings || {};
+      const prev = d.myRatings[pid];
+      const r = d.ratings[pid] || (d.ratings[pid] = {sum:0, n:0});
+      if(prev !== undefined && prev !== null){ r.sum -= prev; r.n -= 1 }
+      const next = prev === stars ? null : stars;
+      if(next === null){ delete d.myRatings[pid] } else { d.myRatings[pid] = next; r.sum += next; r.n += 1 }
+      save();
+      if(LIVE) run("rate", BROWSER_ID, pid, next === null ? "" : next).then(x => { if(x && x.error) toast(x.error) })
+                 .catch(() => toast("Your rating didn't save. Please check your connection and try again."));
     },
     async comment(pid, text){
       if(LIVE){
@@ -720,7 +747,7 @@ let dirty = false;
 
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])) }
 function counts(pid){ return Store.data().counts[pid] || {up:0,unsure:0,down:0} }
-function score(pid){ const c=counts(pid); return (c.up - c.down) + (c.up+c.unsure+c.down)*0.001 }
+function score(pid){ const c=counts(pid); return (c.up - c.down) + (c.up+c.unsure+c.down)*0.001 + ratingOf(pid).avg*0.0001 }
 function hidden(id){ return (Store.data().flags[id]||0) >= FLAG_HIDE }
 
 function allItems(){
@@ -808,6 +835,25 @@ function wireGalleries(root){
   });
 }
 
+function ratingOf(pid){ const r = (Store.data().ratings||{})[pid]; return r && r.n ? {avg:r.sum/r.n, n:r.n} : {avg:0, n:0} }
+function safetyHTML(p){
+  const d = Store.data();
+  if(!d.ratings) return "";            // hidden until the Google script supports ratings
+  const mine = (d.myRatings||{})[p.id];
+  const r = ratingOf(p.id);
+  const btns = [0,1,2,3,4,5].map(n => {
+    const on = mine !== undefined && mine !== null && (n === 0 ? mine === 0 : n <= mine);
+    const label = n === 0 ? "0 stars: no safer than today" : n + (n===1?" star":" stars") + (n===5?": comfortably safe":"");
+    return `<button type="button" class="star${n===0?" zero":""}${on?" on":""}" data-s="${n}" data-pid="${esc(p.id)}" aria-label="${label}" aria-pressed="${mine===n}">${n===0?"0":"★"}</button>`;
+  }).join("");
+  return `<div class="safety">
+      <div class="sq">How much safer would this make you feel?</div>
+      <div class="stars" role="group" aria-label="Safety rating for: ${esc(p.title)}">${btns}</div>
+      <div class="sscale"><span>0 = no safer than today</span><span>5 = comfortably safe</span></div>
+      <div class="savg">${r.n ? `Neighbors' average: <b>${r.avg.toFixed(1)} ★</b> from ${r.n} rating${r.n===1?"":"s"}` : "No safety ratings yet"}${mine!==undefined&&mine!==null?` · <span class="you">your rating: ${mine}</span>`:""}</div>
+    </div>`;
+}
+
 function tileHTML(p){
   const d = Store.data();
   if(p.reported && hidden(p.id)){
@@ -832,8 +878,8 @@ function tileHTML(p){
       </div>
       <h3>${esc(p.title)}</h3>
       <p class="where">📍 ${esc(p.where)}</p>
-      <p>${esc(p.change)}</p>
-      ${p.why ? `<p class="why"><b>${p.by==="Neighbors"?"Why: ":"The problem: "}</b>${esc(p.why)}</p>` : ""}
+      ${p.why ? `<p class="why"><b>The problem:</b> ${esc(p.why)}</p>` : ""}
+      <p class="proposal">${p.reported ? "" : "<b>The proposal:</b> "}${esc(p.change)}</p>
       ${p.openQ ? `<p class="open-q">❓ ${esc(p.openQ)}</p>` : ""}
       ${p.reported ? `<p class="who" style="margin:0 0 10px">${esc(p.who)}${p.added?" · added "+esc(String(p.added).slice(0,10)):""} · <button class="flag" data-flag="${esc(p.id)}" ${d.myFlags[p.id]?"disabled":""}>${d.myFlags[p.id]?"Flagged":"Doesn't meet our agreements"}</button></p>` : ""}
       ${p.map ? `<a class="maplink" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.map)}" target="_blank" rel="noopener">Open in Google Maps ↗</a>` : ""}
@@ -843,6 +889,7 @@ function tileHTML(p){
         `<button type="button" class="vote" data-v="${k}" data-pid="${esc(p.id)}" aria-pressed="${mine===k}"><span class="e">${e}</span><span class="n">${c[k]}</span><span class="l">${l}</span></button>`).join("")}
     </div>
     <div class="bar" aria-hidden="true"><i style="width:${pct("up")}%;background:var(--up)"></i><i style="width:${pct("unsure")}%;background:#e2b443"></i><i style="width:${pct("down")}%;background:var(--down)"></i></div>
+    ${safetyHTML(p)}
     <details class="comments" data-pid="${esc(p.id)}">
       <summary>Comments (${comments.filter(x=>!hidden(x.id)).length})</summary>
       <ul class="clist">
@@ -919,6 +966,8 @@ document.getElementById("board").addEventListener("click", e => {
     if(!dirty){ dirty = true; document.getElementById("resortBtn").classList.add("show") }
     render(); return;
   }
+  const st = e.target.closest(".star");
+  if(st){ Store.rate(st.dataset.pid, Number(st.dataset.s)); if(!dirty){ dirty = true; document.getElementById("resortBtn").classList.add("show") } render(); return; }
   const ot = e.target.closest("[data-ovtoggle]");
   if(ot){ const fr = ot.closest(".frame"); fr.classList.toggle("ov-off"); ot.textContent = fr.classList.contains("ov-off") ? "Show drawings" : "Hide drawings"; return; }
   const f = e.target.closest("[data-flag]");
@@ -956,11 +1005,11 @@ if(!FORM_URL) document.querySelector(".formmissing").style.display = "block";
 function csvCell(s){ s = String(s==null?"":s); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s }
 function buildCSV(){
   const d = Store.data(), items = allItems();
-  const rows = [["Type","Card","Proposed by","Location","Support","Unsure","Oppose","Net support","Comment / description","From","Hidden by flags"]];
+  const rows = [["Type","Card","Proposed by","Location","Support","Unsure","Oppose","Net support","Avg safety (0-5)","Safety ratings","Comment / description","From","Hidden by flags"]];
   items.slice().sort((a,b)=>score(b.id)-score(a.id)).forEach(p => {
     const c = counts(p.id);
-    rows.push([p.reported?"Neighbor report":"Proposal", p.title, p.by, p.where, c.up, c.unsure, c.down, c.up-c.down, p.reported?p.change:"", p.who||"", hidden(p.id)?"yes":""]);
-    d.comments.filter(x=>x.pid===p.id).forEach(x => rows.push(["Comment", p.title, "", "", "", "", "", "", x.text, x.who, hidden(x.id)?"yes":""]));
+    rows.push([p.reported?"Neighbor report":"Proposal", p.title, p.by, p.where, c.up, c.unsure, c.down, c.up-c.down, ratingOf(p.id).n ? ratingOf(p.id).avg.toFixed(2) : "", ratingOf(p.id).n, p.reported?p.change:"", p.who||"", hidden(p.id)?"yes":""]);
+    d.comments.filter(x=>x.pid===p.id).forEach(x => rows.push(["Comment", p.title, "", "", "", "", "", "", "", "", x.text, x.who, hidden(x.id)?"yes":""]));
   });
   return rows.map(r=>r.map(csvCell).join(",")).join("\n");
 }
